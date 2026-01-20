@@ -1,6 +1,6 @@
 from .cl_dataset_module import CLDataModule
 from .cl_cifar10 import CLCIFAR10
-from .cl_cifar20 import CLCIFAR20
+from .cl_cifar20 import CLCIFAR20, CIFAR100
 from .cl_yeast import CLYeast
 from .cl_texture import CLTexture
 from .cl_control import CLControl
@@ -14,6 +14,7 @@ from .cl_micro_imagenet10 import CLMicro_ImageNet10
 from .cl_micro_imagenet20 import CLMicro_ImageNet20
 from .acl_micro_imagenet10 import ACLMicro_ImageNet10
 from .acl_micro_imagenet20 import ACLMicro_ImageNet20
+from .cl_tiny import CLTiny200
 
 D_LIST = {
     "mnist": CLMNIST, 
@@ -21,8 +22,9 @@ D_LIST = {
     "fmnist": CLFMNIST, 
     "cifar10": CLCIFAR10, 
     "cifar20": CLCIFAR20, 
+    "cifar100": CIFAR100, 
     "aclcifar10": ACLCIFAR10, 
-    "aclcifar10": ACLCIFAR20, 
+    "aclcifar20": ACLCIFAR20, 
     "yeast": CLYeast, 
     "control": CLControl, 
     "dermatology": CLDermatology, 
@@ -34,7 +36,8 @@ D_LIST = {
     "clmicro_imagenet10": CLMicro_ImageNet10, 
     "clmicro_imagenet20": CLMicro_ImageNet20, 
     "aclmicro_imagenet10": ACLMicro_ImageNet10, 
-    "aclmicro_imagenet20": ACLMicro_ImageNet20, 
+    "aclmicro_imagenet20": ACLMicro_ImageNet20,
+    "tiny200":  CLTiny200,
 }
 
 def prepare_cl_data_module(
@@ -45,9 +48,10 @@ def prepare_cl_data_module(
     one_hot=False,
     transition_matrix=None,
     num_cl=1,
-    augment=False,
     noise=0.1,
     seed=1126,
+    uni_injection=False,
+    data_augment="flipflop",
 ):
 
     dataset_class = D_LIST[dataset]
@@ -60,8 +64,9 @@ def prepare_cl_data_module(
         one_hot=one_hot,
         transition_matrix=transition_matrix,
         num_cl=num_cl,
-        augment=augment,
         noise=noise,
         seed=seed,
+        uni_injection=uni_injection,
+        data_augment=data_augment,
     )
     return cl_data_module

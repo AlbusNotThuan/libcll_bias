@@ -39,9 +39,12 @@ class ResNet18(nn.Module):
         self.resnet.conv1 = nn.Conv2d(
             3, 64, kernel_size=3, stride=1, padding=1, bias=False
         )
-        nn.init.kaiming_normal_(
-            self.resnet.conv1.weight, mode="fan_out", nonlinearity="relu"
-        )
+        # nn.init.kaiming_normal_(
+        #     self.resnet.conv1.weight, mode="fan_out", nonlinearity="relu"
+        # )
+
+        num_ftrs = self.resnet.fc.in_features
+        self.resnet.fc = nn.Linear(num_ftrs, num_classes)
 
     def forward(self, x):
         return self.resnet(x)

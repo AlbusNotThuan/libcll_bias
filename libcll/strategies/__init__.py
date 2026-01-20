@@ -8,6 +8,7 @@ from .CPE import CPE
 from .OP import OP
 from .PC import PC
 from .SCARCE import SCARCE
+from .CE import CE
 
 STRATEGY_LIST = {
     "SCL": SCL,
@@ -18,7 +19,8 @@ STRATEGY_LIST = {
     "CPE": CPE,
     "OP": OP, 
     "PC": PC, 
-    "SCARCE": SCARCE, 
+    "SCARCE": SCARCE,
+    "CE": CE,
 }
 
 

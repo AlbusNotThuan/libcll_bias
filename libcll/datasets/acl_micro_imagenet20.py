@@ -99,7 +99,7 @@ class ACLMicro_ImageNet20(torchvision.datasets.CIFAR10, CLBaseDataset):
                 transform=train_transform,
             )
             if dataset_name == "micro_imagenet20":
-                Q = get_transition_matrix(transition_matrix, dataset.num_classes, noise, seed)
+                Q = get_transition_matrix(transition_matrix, "micro_imagenet20", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
         else:
             test_transform = transforms.Compose(

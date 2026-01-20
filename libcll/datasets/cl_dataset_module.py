@@ -29,9 +29,10 @@ class CLDataModule(pl.LightningDataModule):
         one_hot=False,
         transition_matrix=None,
         num_cl=1,
-        augment=False,
         noise=0.1,
         seed=1126,
+        uni_injection=False,
+        data_augment="flipflop",
     ):
         super().__init__()
         self.dataset_name = dataset_name
@@ -42,13 +43,14 @@ class CLDataModule(pl.LightningDataModule):
         self.one_hot = one_hot
         self.transition_matrix = transition_matrix
         self.num_cl = num_cl
-        self.augment = augment
         self.noise = noise
         self.seed = seed
+        self.uni_injection = uni_injection
+        self.data_augment = data_augment
     
     def setup(self, stage=None):
         pl.seed_everything(self.seed, workers=True)
-        self.train_set = self.dataset_class.build_dataset(self.dataset_name, train=True, num_cl=self.num_cl, transition_matrix=self.transition_matrix, noise=self.noise, seed=self.seed)
+        self.train_set = self.dataset_class.build_dataset(self.dataset_name, train=True, num_cl=self.num_cl, transition_matrix=self.transition_matrix, noise=self.noise, seed=self.seed, data_augment=self.data_augment)
         self.test_set = self.dataset_class.build_dataset(self.dataset_name, train=False)
         idx = np.arange(len(self.train_set))
         np.random.shuffle(idx)
@@ -114,6 +116,18 @@ class CLDataModule(pl.LightningDataModule):
         return test_loader
     
     def get_distribution_info(self):
+        # Inject the uniform transition matrix if uni_injection is True
+        if self.uni_injection:
+            Q = torch.ones((self.train_set.num_classes, self.train_set.num_classes)) - torch.eye(self.train_set.num_classes)
+            Q = Q / (self.train_set.num_classes - 1)
+            class_priors = torch.ones(self.train_set.num_classes)
+            class_priors = class_priors / class_priors.sum()
+            return (
+                Q, 
+                class_priors
+            )
+    
+        # Estimate Q and class priors from training data
         Q = torch.zeros((self.train_set.num_classes, self.train_set.num_classes))
         for idx in self.train_idx:
             Q[self.train_set.true_targets[idx].long()] += torch.histc(
@@ -122,7 +136,7 @@ class CLDataModule(pl.LightningDataModule):
         class_priors = Q.sum(dim=0)
         Q = Q / Q.sum(dim=1).view(-1, 1)
         if self.transition_matrix == "noisy":
-            Q = get_transition_matrix("strong", self.train_set.num_classes, self.seed)
+            Q = get_transition_matrix("strong", self.dataset_name, self.train_set.num_classes, self.noise, self.seed)
         return (
             Q,
             class_priors,

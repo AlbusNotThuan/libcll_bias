@@ -9,7 +9,7 @@ class FWD(Strategy):
     def training_step(self, batch, batch_idx):
         x, y = batch
         out = self.model(x)
-        p = torch.mm(F.softmax(out, dim=1), self.Q) + 1e-6
+        p = torch.mm(F.softmax(out, dim=1), self.Q.to(out.device)) + 1e-6
         loss = F.nll_loss(p.log(), y.long())
         self.log("Train_Loss", loss)
         return loss

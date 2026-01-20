@@ -7,6 +7,7 @@ import gdown
 import os
 from libcll.datasets.cl_base_dataset import CLBaseDataset
 from libcll.datasets.utils import get_transition_matrix
+from libcll.datasets.augmentation import get_augmentation, get_test_transform
 
 
 class CLCIFAR10(torchvision.datasets.CIFAR10, CLBaseDataset):
@@ -55,7 +56,7 @@ class CLCIFAR10(torchvision.datasets.CIFAR10, CLBaseDataset):
 
     def __init__(
         self,
-        root="./data/cifar10",
+        root="../data/cifar10",
         train=True,
         transform=None,
         target_transform=None,
@@ -85,32 +86,29 @@ class CLCIFAR10(torchvision.datasets.CIFAR10, CLBaseDataset):
         self.input_dim = 3 * 32 * 32
     
     @classmethod
-    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126):
+    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126, data_augment="flipflop"):
         if train:
-            train_transform = transforms.Compose(
-                [
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        [0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]
-                    ),
-                ]
+            train_transform = get_augmentation(
+                augment_type=data_augment,
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616],
+                image_size=32
             )
             dataset = self(
                 train=True,
                 transform=train_transform,
                 num_cl=num_cl, 
             )
+            # Only generate synthetic complementary labels if dataset_name is "cifar10"
+            # For "clcifar10", use the real-world complementary labels from the pickle file
             if dataset_name == "cifar10":
-                Q = get_transition_matrix(transition_matrix, dataset.num_classes, noise, seed)
+                Q = get_transition_matrix(transition_matrix, "cifar10", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
+
         else:
-            test_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize([0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]),
-                ]
+            test_transform = get_test_transform(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616]
             )
             dataset = self(
                 train=False,

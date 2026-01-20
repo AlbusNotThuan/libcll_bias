@@ -55,7 +55,7 @@ class ACLCIFAR10(torchvision.datasets.CIFAR10, CLBaseDataset):
 
     def __init__(
         self,
-        root="./data/cifar10",
+        root="../data/cifar10",
         train=True,
         transform=None,
         target_transform=None,
@@ -103,7 +103,7 @@ class ACLCIFAR10(torchvision.datasets.CIFAR10, CLBaseDataset):
                 num_cl=num_cl, 
             )
             if dataset_name == "cifar10":
-                Q = get_transition_matrix(transition_matrix, dataset.num_classes, noise, seed)
+                Q = get_transition_matrix(transition_matrix, "cifar10", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
         else:
             test_transform = transforms.Compose(

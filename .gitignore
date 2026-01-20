@@ -2,7 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
-/libcll/dataset/data/
+/libcll/dataset/data/'
+
+# All logs
+*.ckpt
+lightning_logs/
+data/
+.vscode/
 
 # C extensions
 *.so

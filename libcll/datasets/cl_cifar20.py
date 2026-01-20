@@ -7,6 +7,7 @@ import gdown
 import os
 from libcll.datasets.cl_base_dataset import CLBaseDataset
 from libcll.datasets.utils import get_transition_matrix
+from libcll.datasets.augmentation import get_augmentation, get_test_transform
 
 
 def _cifar100_to_cifar20(target):
@@ -163,7 +164,7 @@ class CLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
 
     def __init__(
         self,
-        root="./data/cifar20",
+        root="../data/cifar20",
         train=True,
         transform=None,
         target_transform=None,
@@ -195,17 +196,13 @@ class CLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
         self.input_dim = 3 * 32 * 32
     
     @classmethod
-    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126):
+    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126, data_augment="flipflop"):
         if train:
-            train_transform = transforms.Compose(
-                [
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        [0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]
-                    ),
-                ]
+            train_transform = get_augmentation(
+                augment_type=data_augment,
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616],
+                image_size=32
             )
             dataset = self(
                 train=True,
@@ -213,14 +210,103 @@ class CLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
                 num_cl=num_cl, 
             )
             if dataset_name == "cifar20":
-                Q = get_transition_matrix(transition_matrix, dataset.num_classes, noise, seed)
+                Q = get_transition_matrix(transition_matrix, "cifar20", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
         else:
-            test_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize([0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]),
-                ]
+            test_transform = get_test_transform(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616]
+            )
+            dataset = self(
+                train=False,
+                transform=test_transform,
+                num_cl=num_cl, 
+            )
+        return dataset
+
+class CIFAR100(torchvision.datasets.CIFAR100, CLBaseDataset):
+    """
+
+    CIFAR100 dataset with support for synthetic complementary labels.
+
+    Parameters
+    ----------
+    root : str
+        path to store dataset file.
+
+    train : bool
+        training set if True, else testing set.
+
+    transform : callable, optional
+        a function/transform that takes in a PIL image and returns a transformed version.
+
+    target_transform : callable, optional
+        a function/transform that takes in the target and transforms it.
+
+    download : bool
+        if true, downloads the dataset from the internet and puts it in root directory. If dataset is already downloaded, it is not downloaded again.
+
+    num_cl : int
+        the number of complementary labels for each data point.
+
+    Attributes
+    ----------
+    data : Tensor
+        the feature of sample set.
+
+    targets : Tensor
+        the complementary labels for corresponding sample (or true labels before gen_complementary_target is called).
+
+    true_targets : Tensor
+        the ground-truth labels for corresponding sample.
+
+    num_classes : int
+        the number of classes (100 for CIFAR100).
+
+    input_dim : int
+        the feature space after data compressed into a 1D dimension.
+
+    """
+
+    def __init__(
+        self,
+        root="../data/cifar100",
+        train=True,
+        transform=None,
+        target_transform=None,
+        download=True,
+        num_cl=1,
+    ):
+        super(CIFAR100, self).__init__(
+            root, train, transform, target_transform, download
+        )
+        # Convert targets to tensor and store as true_targets
+        self.targets = torch.Tensor(self.targets)
+        self.true_targets = self.targets.clone()
+        
+        self.num_classes = 100
+        self.input_dim = 3 * 32 * 32
+    
+    @classmethod
+    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126, data_augment="flipflop"):
+        if train:
+            train_transform = get_augmentation(
+                augment_type=data_augment,
+                mean=[0.5071, 0.4867, 0.4408],
+                std=[0.2675, 0.2565, 0.2761],
+                image_size=32
+            )
+            dataset = self(
+                train=True,
+                transform=train_transform,
+                num_cl=num_cl, 
+            )
+            Q = get_transition_matrix(transition_matrix, "cifar100", dataset.num_classes, noise, seed)
+            dataset.gen_complementary_target(num_cl, Q)
+        else:
+            test_transform = get_test_transform(
+                mean=[0.5071, 0.4867, 0.4408],
+                std=[0.2675, 0.2565, 0.2761]
             )
             dataset = self(
                 train=False,

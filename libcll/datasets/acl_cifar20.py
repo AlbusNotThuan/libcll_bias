@@ -212,7 +212,7 @@ class ACLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
                 num_cl=num_cl, 
             )
             if dataset_name == "cifar20":
-                Q = get_transition_matrix(transition_matrix, dataset.num_classes, noise, seed)
+                Q = get_transition_matrix(transition_matrix, "cifar20", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
         else:
             test_transform = transforms.Compose(

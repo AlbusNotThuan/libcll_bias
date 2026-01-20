@@ -10,7 +10,9 @@ class CPE(Strategy):
     def __init__(self, **args):
         super().__init__(**args)
         if self.type == "T":
-            self.Q = self.Q.log()
+            # self.Q = self.Q.log()
+            # Clamp Q to ensure positive values before log to prevent -Inf
+            self.Q = torch.clamp(self.Q, min=1e-6).log()
             self.model.register_parameter(
                 name="Q", param=torch.nn.Parameter(self.Q, requires_grad=True)
             )
@@ -20,16 +22,16 @@ class CPE(Strategy):
         out = self.model(x)
         out = F.softmax(out, dim=1)
         if self.type == "I":
-            loss = F.nll_loss(out.log(), y.long())
+            loss = F.nll_loss(torch.clamp(out, min=1e-6).log(), y.long())
         elif self.type == "F":
-            Q = self.Q
+            Q = self.Q.to(out.device)
             out = torch.mm(out, Q) + 1e-6
-            loss = F.nll_loss(out.log(), y.long())
+            loss = F.nll_loss(torch.clamp(out, min=1e-6).log(), y.long())
         elif self.type == "T":
             Q = self.model.Q
             Q = F.softmax(Q, dim=1)
             out = torch.mm(out, Q) + 1e-6
-            loss = F.nll_loss(out.log(), y.long())
+            loss = F.nll_loss(torch.clamp(out, min=1e-6).log(), y.long())
         else:
             raise NotImplementedError(
                 'The type of CPE must be chosen from "I", "F" or "T".'
@@ -46,9 +48,9 @@ class CPE(Strategy):
             )
         out = F.softmax(out, dim=1)
         if self.type == "I":
-            Q = self.Q
+            Q = self.Q.to(out.device)
         elif self.type == "F":
-            Q = self.Q
+            Q = self.Q.to(out.device)
             out = torch.mm(out, Q) + 1e-6
         elif self.type == "T":
             Q = self.model.Q
@@ -60,7 +62,7 @@ class CPE(Strategy):
             )
 
         if self.valid_type == "SCEL":
-            val_loss = F.nll_loss(out.log(), y.long())
+            val_loss = F.nll_loss(torch.clamp(out, min=1e-6).log(), y.long())
         if self.valid_type == "Accuracy":
             y_pred = torch.argmin(torch.abs(out.unsqueeze(dim=1) - Q).sum(dim=2), dim=1)
             val_loss = (y_pred == y).sum() / y_pred.shape[0]
@@ -72,9 +74,9 @@ class CPE(Strategy):
         out = self.model(x)
         out = F.softmax(out, dim=1)
         if self.type == "I":
-            Q = self.Q
+            Q = self.Q.to(out.device)
         elif self.type == "F":
-            Q = self.Q
+            Q = self.Q.to(out.device)
             out = torch.mm(out, Q) + 1e-6
         elif self.type == "T":
             Q = self.model.Q

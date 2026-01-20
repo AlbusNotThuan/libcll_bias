@@ -75,7 +75,7 @@ class Strategy(pl.LightningModule):
         Compute the Unbiased Risk Estimator loss.
         """
         out = -F.log_softmax(out, dim=1)
-        loss_mat = torch.mm(out, self.Qinv.t())
+        loss_mat = torch.mm(out, self.Qinv.to(out.device).t())
         loss = -F.nll_loss(loss_mat, y.long())
         return loss
 
@@ -84,7 +84,7 @@ class Strategy(pl.LightningModule):
         Compute the Surrogate Complementary Esimation Loss.
         """
         out = out.softmax(dim=1)
-        out = torch.mm(out, self.Q)
+        out = torch.mm(out, self.Q.to(out.device))
         out = (out + 1e-6).log()
         loss = F.nll_loss(out, y.long())
         return loss
@@ -96,6 +96,13 @@ class Strategy(pl.LightningModule):
         y_pred = torch.argmax(out, dim=1)
         acc = (y_pred == y).sum() / y_pred.shape[0]
         return acc
+
+    def compute_ce(self, out, y):
+        """
+        Compute the Cross Entropy loss.
+        """
+        loss = F.nll_loss(F.log_softmax(out, dim=1), y.long())
+        return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
@@ -128,9 +135,9 @@ class Strategy(pl.LightningModule):
 
     def on_test_epoch_end(self):
         avg_test_acc = torch.stack(self.test_acc).mean()
-        self.log("Test_Accuracy", avg_test_acc)
+        self.log("Test_Accuracy", avg_test_acc * 100)
         self.test_acc.clear()
 
     def configure_optimizers(self):
-        optimizer = Adam(self.model.parameters(), lr=self.lr)
+        optimizer = Adam(self.model.parameters(), lr=self.lr, weight_decay=1e-5)
         return optimizer

@@ -1,3 +1,4 @@
+from math import perm
 import torch
 import numpy as np
 import inspect
@@ -113,6 +114,87 @@ def noisy(num_classes, noise=0.1, seed=1126):
     Q = (1 - noise) * Q + noise * torch.ones(num_classes, num_classes) / num_classes
     return Q
 
+def ablation_study_1(num_classes, type=None, seed=1126):
+    Q = torch.zeros(num_classes, num_classes)
+    rng = np.random.default_rng(seed=seed)
+    n = 4  # type should be a string number like "3" or "5"
+
+    if type == "setup4":
+        distribution_3 = [0.9, 0.05, 0.03, 0.02]
+        # Choose for each true label one unique complementary label distributed other prob randomly
+        # Create a dict containing all possible label combinations
+        while True:
+            perm = rng.permutation(num_classes)
+            if not np.any(perm == np.arange(num_classes)):
+                break
+
+        label_lookup = {i: perm[i] for i in range(num_classes)}
+
+
+
+        for key, value in label_lookup.items():
+            Q[key, value] = distribution_3[0]  # Set the main complementary label with prob 0.9
+            other_probs = distribution_3[1:]  # Remaining probabilities
+            other_labels = [i for i in range(num_classes) if i != key and i != value]
+            rng.shuffle(other_labels)
+            for j in range(len(other_probs)):
+                Q[key, other_labels[j]] = other_probs[j]
+
+        for i in range(num_classes):
+            row_sum = Q[i].sum()
+            if not torch.isclose(row_sum, torch.tensor(1.0)):
+                raise ValueError(f"Row {i} of transition matrix does not sum to 1 (sums to {row_sum.item()})")
+    
+        # DEBUG: Print the generated matrix for verification
+        print(f"Ablation Study Transition Matrix ({type}):")
+        # Pretty Print n by n matrix
+        for i in range(num_classes):
+            row_str = " ".join([f"{Q[i, j]:.4f}" for j in range(num_classes)])
+            print(row_str)
+        
+        return Q
+
+    for i in range(num_classes):
+        # Create a mask for valid positions (not diagonal)
+        valid_positions = list(range(num_classes))
+        valid_positions.remove(i)  # Remove diagonal position
+        
+        # Randomly select n positions
+        selected_positions = rng.choice(valid_positions, size=n, replace=False)
+
+        if type == "setup1":
+            # Set probability of 1/n for selected positions
+            Q[i, selected_positions] = 1.0 / n
+
+        elif type == "setup2":
+            distribution_2 = [0.6, 0.2, 0.1, 0.1]
+            # Set the selected positions with the specified distribution
+            Q[i, selected_positions] = torch.tensor(distribution_2) 
+
+        elif type == "setup3":
+            distribution_3 = [0.9, 0.05, 0.03, 0.02]
+            # Set the selected positions with the specified distribution
+            Q[i, selected_positions] = torch.tensor(distribution_3)
+            
+        else:
+            raise ValueError(f"Ablation study type '{type}' is not implemeted.")
+        
+    # Final validity check
+    # Ensure each row sums to 1
+    for i in range(num_classes):
+        row_sum = Q[i].sum()
+        if not torch.isclose(row_sum, torch.tensor(1.0)):
+            raise ValueError(f"Row {i} of transition matrix does not sum to 1 (sums to {row_sum.item()})")
+    
+    # # DEBUG: Print the generated matrix for verification
+    # print(f"Ablation Study Transition Matrix ({type}):")
+    # # Pretty Print n by n matrix
+    # for i in range(num_classes):
+    #     row_str = " ".join([f"{Q[i, j]:.4f}" for j in range(num_classes)])
+    #     print(row_str)
+    
+    return Q
+
 
 Q_LIST = {
     "uniform": Uniform,
@@ -122,7 +204,7 @@ Q_LIST = {
 }
 
 
-def get_transition_matrix(transition_matrix, num_classes, noise=0.1, seed=1126):
+def get_transition_matrix(transition_matrix, dataset, num_classes, noise=0.1, seed=1126):
     """
 
     Return desired class transition probability matrix.
@@ -130,7 +212,10 @@ def get_transition_matrix(transition_matrix, num_classes, noise=0.1, seed=1126):
     Parameters
     ----------
     transition_matrix : str
-        the name of transition matrix chosen from "uniform", "weak", "strong", and "noise"
+        the name of transition matrix chosen from "uniform", "weak", "strong", "noise", or a custom file name
+
+    dataset : str
+        the name of the dataset (e.g., "cifar10", "cifar20", "mnist")
 
     num_classes : int
         the number of classes.
@@ -145,15 +230,59 @@ def get_transition_matrix(transition_matrix, num_classes, noise=0.1, seed=1126):
     -------
     a tensor with shape (``num_classes``, ``num_classes``).
     """
-    if transition_matrix not in Q_LIST:
+
+    # First check if the transition_matrix is None
+    if transition_matrix is None:
+        return None
+    #  check if it's a built-in transition matrix
+
+    if '_' in transition_matrix and transition_matrix.split('_')[0] == 'as':
+        type = transition_matrix.split('_')[1]
+        return ablation_study_1(num_classes, type, seed)
+
+    if transition_matrix in Q_LIST:
+        args = {
+            "num_classes": num_classes,
+            "noise": noise,
+            "seed": seed,
+        }
+        Q = Q_LIST[transition_matrix]
+        Q_args = inspect.signature(Q).parameters
+        return Q(**{arg: args[arg] for arg in args if arg in Q_args})
+    
+    # Otherwise, try to load from file
+    import os
+    transition_matrix_path = os.path.join("libcll", "transition_matrix", dataset, f"{transition_matrix}.txt")
+    
+    if not os.path.exists(transition_matrix_path):
         raise ValueError(
-            f"The transition matrix {transition_matrix} didn't implemented."
+            f"The transition matrix '{transition_matrix}' is not implemented and file not found at: {transition_matrix_path}"
         )
-    args = {
-        "num_classes": num_classes,
-        "noise": noise,
-        "seed": seed,
-    }
-    Q = Q_LIST[transition_matrix]
-    Q_args = inspect.signature(Q).parameters
-    return Q(**{arg: args[arg] for arg in args if arg in Q_args})
+    
+    # Load transition matrix from file
+    try:
+        Q = []
+        with open(transition_matrix_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:  # Skip empty lines
+                    row = [float(x) for x in line.split()]
+                    Q.append(row)
+        
+        Q = torch.tensor(Q, dtype=torch.float32)
+        
+        # Validate dimensions
+        if Q.shape[0] != num_classes or Q.shape[1] != num_classes:
+            raise ValueError(
+                f"Transition matrix in {transition_matrix_path} has shape {Q.shape}, "
+                f"but expected ({num_classes}, {num_classes})"
+            )
+        
+        print(f"Loaded transition matrix from {transition_matrix_path}:")
+        print(f"Matrix shape: {Q.shape}")
+        return Q
+    
+    except Exception as e:
+        raise ValueError(
+            f"Failed to load transition matrix from {transition_matrix_path}: {str(e)}"
+        )
