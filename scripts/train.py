@@ -53,10 +53,10 @@ def main(args):
     # print("Transition Matrix Q:")
     # print(Q.numpy())
     
-    # # Save transition matrix to file
-    # transition_matrix_file = f"{args.dataset._name}.txt"  # Can be changed as needed
-    # np.savetxt(transition_matrix_file, Q.numpy(), fmt='%.6f', delimiter=' ')
-    # print(f"Transition matrix saved to {transition_matrix_file}")
+    # Save transition matrix to file
+    transition_matrix_file = f"{args.dataset._name}.txt"  # Can be changed as needed
+    np.savetxt(transition_matrix_file, Q.numpy(), fmt='%.6f', delimiter=' ')
+    print(f"Transition matrix saved to {transition_matrix_file}")
 
 
     print("Preparing Model......")

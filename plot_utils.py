@@ -51,6 +51,7 @@ def collect_lightning_logs(logs_dir: str = "lightning_logs") -> pd.DataFrame:
                 row['transition_matrix'] = hyperparams.get('transition_matrix')
                 row['seed'] = hyperparams.get('seed')
                 row['model'] = hyperparams.get('model')
+                row['augment'] = hyperparams.get('data_augment')
            
             # Add final metrics
             if 'final_metrics' in data:

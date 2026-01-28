@@ -2,17 +2,18 @@
 # this script is meant to run all algorithm variants on a specific dataset
 
 GPU=${1:-0}
-DATASET="cifar100"
+DATASET="cifar10"
+KMEAN=10
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate cll
 
 # # Algorithm sets with their types
-# declare -A ALGOSET1=(["FWD"]="NL")
+declare -A ALGOSET1=(["FWD"]="NL")
 # declare -A ALGOSET2=(["URE"]="TNN TGA")
-# declare -A ALGOSET3=(["CPE"]="F I T")
+declare -A ALGOSET3=(["CPE"]="F")
 
-declare -A ALGOSET1=(["CE"]="NL")
+# declare -A ALGOSET1=(["CE"]="NL")
 
 # SEEDSET=(42 1126 2202)
 SEEDSET=(42 1126 2202)
@@ -35,7 +36,8 @@ run_experiment() {
         --dataset ${DATASET} \
         --batch_size 512 \
         --valid_type Accuracy \
-        --transition_matrix "llava_true" \
+        --epoch 200 \
+        --transition_matrix llava_simclr_kmean=${KMEAN}_nrand=4 \
         --gpu 0 \
         --seed ${seed} &
 }

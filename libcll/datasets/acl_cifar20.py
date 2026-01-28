@@ -7,6 +7,7 @@ import gdown
 import os
 from libcll.datasets.cl_base_dataset import CLBaseDataset
 from libcll.datasets.utils import get_transition_matrix
+from libcll.datasets.augmentation import get_augmentation, get_test_transform
 
 def _cifar100_to_cifar20(target):
     # obtained from cifar_test script
@@ -194,17 +195,13 @@ class ACLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
         self.input_dim = 3 * 32 * 32
 
     @classmethod
-    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126):
+    def build_dataset(self, dataset_name=None, train=True, num_cl=0, transition_matrix=None, noise=None, seed=1126, data_augment="flipflop"):
         if train:
-            train_transform = transforms.Compose(
-                [
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        [0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]
-                    ),
-                ]
+            train_transform = get_augmentation(
+                augment_type=data_augment,
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616],
+                image_size=32
             )
             dataset = self(
                 train=True,
@@ -215,11 +212,9 @@ class ACLCIFAR20(torchvision.datasets.CIFAR100, CLBaseDataset):
                 Q = get_transition_matrix(transition_matrix, "cifar20", dataset.num_classes, noise, seed)
                 dataset.gen_complementary_target(num_cl, Q)
         else:
-            test_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize([0.4914, 0.4822, 0.4465], [0.247, 0.2435, 0.2616]),
-                ]
+            test_transform = get_test_transform(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.247, 0.2435, 0.2616]
             )
             dataset = self(
                 train=False,

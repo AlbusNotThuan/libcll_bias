@@ -79,11 +79,12 @@ def get_augmentation(augment_type="flipflop", mean=None, std=None, image_size=32
         ]
     
     elif augment_type == "autoaug":
-        # AutoAugment for CIFAR
+        # AutoAugment - use CIFAR10 policy for 32x32 images, IMAGENET policy for larger images
+        policy = transforms.AutoAugmentPolicy.CIFAR10 if image_size == 32 else transforms.AutoAugmentPolicy.IMAGENET
         transform_list = [
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(image_size, padding=padding),
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.AutoAugment(policy),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
         ]

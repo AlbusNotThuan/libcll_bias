@@ -1,177 +1,259 @@
-# libcll: Complementary Label Learning Benchmark
+# Biased Complementary Label Learning (bias_cll)
 
 [![Documentation Status](https://readthedocs.org/projects/libcll/badge/?version=latest)](https://libcll.readthedocs.io/en/latest/?badge=latest) [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-<img src="docs/libcll-cover.png" alt="libcll" style="zoom:25%;" />
+This repository extends `libcll` with support for **biased complementary label distributions** through custom transition matrices. It provides a comprehensive collection of pre-computed transition matrices for various datasets and bias patterns, enabling researchers to study complementary-label learning under realistic, non-uniform labeling conditions.
 
-`libcll` is a Python library designed to simplify complementary-label learning (CLL) for researchers tackling real-world challenges. The package implements a wide range of popular CLL strategies, including **CPE**, the state-of-the-art algorithm as of 2023. Additionally, it includes unique datasets like **CLImage** and **ACLImage**, which feature complementary labels collected from human annotators and VLM annotators. To foster extensibility, `libcll` provides a unified interface for integrating additional strategies, datasets, and models, making it a versatile tool for advancing CLL research. For more details, refer to the associated technical report on [arXiv](https://arxiv.org/abs/2411.12276).
+## Key Features
 
-# Installation
+- **Custom Transition Matrices**: Load and apply transition matrices from a repository of pre-computed bias patterns
+- **Extended Dataset Support**: Includes support for CIFAR-10, CIFAR-20, CIFAR-100, and Tiny-ImageNet-200 with biased complementary labels
+- **Flexible Bias Patterns**: Support for various bias types including VLM-annotated patterns, clustering-based biases, and noise-injected distributions
+
+## Installation
 
 - Python version >= 3.8, <= 3.12
 - Pytorch version >= 1.11, <= 2.0
 - Pytorch Lightning version >= 2.0
-- To install `libcll` and develop locally:
+- To install and develop locally:
 
-```
-git clone git@github.com:ntucllab/libcll.git
-cd libcll
+```bash
+git clone <this-repository-url>
+cd bias_cll
 pip install -e .
 ```
 
-# Running
+## Transition Matrix Repository
+
+This repository includes a comprehensive collection of transition matrices located in `libcll/transition_matrix/`:
+
+### Supported Datasets
+
+- **CIFAR-10** (`libcll/transition_matrix/cifar10/`)
+- **CIFAR-20** (`libcll/transition_matrix/cifar20/`)
+- **CIFAR-100** (`libcll/transition_matrix/cifar100/`)
+- **Tiny-ImageNet-200** (`libcll/transition_matrix/tiny200/`)
+
+### Transition Matrix Types
+
+Each dataset directory contains multiple transition matrix files representing different bias patterns:
+
+- **VLM-Annotated**: Transition matrices derived from Vision-Language Model annotations (e.g., `llava_*.txt`)
+- **Clustering-Based**: Matrices based on visual similarity clustering (e.g., `llava_kmean=*_nrand=*.txt`)
+- **Most and Least**: Least/most relevant classes to 4 random labels (e.g., `least.txt`, `most.txt`)
+- **Noise-Injected**: Controlled noise condition, whether the options has true label (e.g., `llava_noise=True-nrand=*.txt`)
+- **Random**: Random uniform patterns (e.g., `random.txt`)
+- **Custom**: Custom-defined patterns (e.g., `weak_10.txt`, `strong_20.txt`)
+
+## Quick Start: Training with Transition Matrices
+
+### Default: Uniform Distribution
+
+When no `--transition_matrix` argument is provided, the system defaults to uniform complementary label distribution:
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy SCL \
+  --type NL \
+  --model ResNet18 \
+  --dataset cifar10 \
+  --lr 1e-4 \
+  --batch_size 256 \
+  --valid_type Accuracy
+```
+
+### Using a Custom Transition Matrix
+
+To use a specific transition matrix from the repository, use the `--transition_matrix` argument with the filename (without `.txt` extension):
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy SCL \
+  --type NL \
+  --model ResNet18 \
+  --dataset cifar10 \
+  --lr 1e-4 \
+  --batch_size 256 \
+  --valid_type Accuracy \
+  --transition_matrix llava_kmean=10_nrand=4
+```
+
+### Example: CIFAR-10 with VLM-Based Bias
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy CPE \
+  --type T \
+  --model ResNet18 \
+  --dataset cifar10 \
+  --lr 1e-4 \
+  --batch_size 128 \
+  --valid_type Accuracy \
+  --transition_matrix llava_noise=False-nrand=4
+
+### Example: CIFAR-100 with Clustering-Based Bias
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy SCL \
+  --type NL \
+  --model ResNet34 \
+  --dataset cifar100 \
+  --lr 1e-4 \
+  --batch_size 128 \
+  --valid_type Accuracy \
+  --transition_matrix llava_kmean=100_nrand=4
+```
+
+### Example: Tiny-ImageNet-200 with Random Bias
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy URE \
+  --type TNN \
+  --model ResNet50 \
+  --dataset tiny200 \
+  --lr 1e-4 \
+  --batch_size 64 \
+  --valid_type Accuracy \
+  --transition_matrix random
+```
 
 ## Supported Strategies
 
-| Strategies                                                 | Type             | Description                                                  |
-| ---------------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| [PC](https://arxiv.org/pdf/1705.07541)                     | None             | Pairwise-Comparison Loss                                     |
-| [SCL](https://arxiv.org/pdf/2007.02235.pdf)                | NL, EXP          | Surrogate Complementary Loss with the negative log loss (NL) or with the exponential loss (EXP) |
-| [URE](https://arxiv.org/pdf/1810.04327.pdf)                | NN, GA, TNN, TGA | Unbiased Risk Estimator whether with gradient ascent (GA) or empirical transition matrix (T) |
-| [FWD](https://arxiv.org/pdf/1711.09535.pdf)                | None             | Forward Correction                                           |
-| [DM](http://proceedings.mlr.press/v139/gao21d/gao21d.pdf)  | None             | Discriminative Models with Weighted Loss                     |
-| [CPE](https://arxiv.org/pdf/2209.09500.pdf)                | I, F, T          | Complementary Probability Estimates with different transition matrices (I, F, T) |
-| [MCL](https://arxiv.org/pdf/1912.12927.pdf)                | MAE, EXP, LOG    | Multiple Complementary Label learning with different errors (MAE, EXP, LOG) |
-| [OP](https://proceedings.mlr.press/v206/liu23g/liu23g.pdf) | None             | Order-Preserving Loss                                        |
-| [SCARCE](https://arxiv.org/pdf/2311.15502)                 | None             | Selected-Completely-At-Random Complementary-label learning   |
+All strategies from the original `libcll` are supported:
+
+| Strategy | Type | Description |
+|----------|------|-------------|
+| [PC](https://arxiv.org/pdf/1705.07541) | None | Pairwise-Comparison Loss |
+| [SCL](https://arxiv.org/pdf/2007.02235.pdf) | NL, EXP | Surrogate Complementary Loss |
+| [URE](https://arxiv.org/pdf/1810.04327.pdf) | NN, GA, TNN, TGA | Unbiased Risk Estimator |
+| [FWD](https://arxiv.org/pdf/1711.09535.pdf) | None | Forward Correction |
+| [DM](http://proceedings.mlr.press/v139/gao21d/gao21d.pdf) | None | Discriminative Models with Weighted Loss |
+| [CPE](https://arxiv.org/pdf/2209.09500.pdf) | I, F, T | Complementary Probability Estimates |
+| [MCL](https://arxiv.org/pdf/1912.12927.pdf) | MAE, EXP, LOG | Multiple Complementary Label Learning |
+| [OP](https://proceedings.mlr.press/v206/liu23g/liu23g.pdf) | None | Order-Preserving Loss |
+| [SCARCE](https://arxiv.org/pdf/2311.15502) | None | Selected-Completely-At-Random CLL |
 
 ## Supported Datasets
 
-| Dataset     | Number of Classes | Input Size  | Description                                                  |
-| ----------- | --------------- | ----------- | ------------------------------------------------------------ |
-| MNIST       | 10              | 28 x 28     | Grayscale images of handwritten digits (0 to 9).             |
-| FMNIST      | 10              | 28 x 28     | Grayscale images of fashion items.                           |
-| KMNIST      | 10              | 28 x 28     | Grayscale images of cursive Japanese (“Kuzushiji”) characters. |
-| [Yeast](https://www.openml.org/search?type=data&status=active&id=181) | 10              | 8           | Features of different localization sites of protein.         |
-| [Texture](https://www.openml.org/search?type=data&status=active&id=40499) | 11              | 40          | Features of different textures.                              |
-| [Dermatology](https://www.openml.org/search?type=data&status=active&id=35) | 6               | 130         | Clinical Attributes of different diseases.                              |
-| [Control](https://www.openml.org/search?type=data&status=active&id=377) | 6               | 60          | Features of synthetically generated control charts.          |
-| CIFAR10 | 10 | 3 x 32 x 32 | Colored images of different objects. |
-| CIFAR20     | 20              | 3 x 32 x 32 | Colored images of different objects. |
-| Micro ImageNet10   | 10                | 3 x 64 x 64 | Contains images of 10 classes designed for computer vision research. |
-| Micro ImageNet20 | 20 | 3 x 64 x 64 | Contains images of 20 classes designed for computer vision research. |
-| CLCIFAR10   | 10              | 3 x 32 x 32 | Colored images of distinct objects paired with complementary labels annotated by humans. |
-| CLCIFAR20   | 20              | 3 x 32 x 32 | Colored images of distinct objects paired with complementary labels annotated by humans. |
-| CLMicro ImageNet10 | 10 | 3 x 64 x 64 | Contains images of 10 classes designed for computer vision research paired with complementary labels annotated by humans. |
-| CLMicro ImageNet20 | 20 | 3 x 64 x 64 | Contains images of 20 classes designed for computer vision research paired with complementary labels annotated by humans. |
-| ACLCIFAR10   | 10              | 3 x 32 x 32 | Colored images of distinct objects paired with complementary labels annotated by Visual-Language Models. |
-| ACLCIFAR20   | 20              | 3 x 32 x 32 | Colored images of distinct objects paired with complementary labels annotated by Visual-Language Models. |
-| ACLMicro ImageNet10 | 10 | 3 x 64 x 64 | Contains images of 10 classes designed for computer vision research paired with complementary labels annotated by Visual-Language Models. |
-| ACLMicro ImageNet20 | 20 | 3 x 64 x 64 | Contains images of 20 classes designed for computer vision research paired with complementary labels annotated by Visual-Language Models. |
+### Extended Datasets (with transition matrix support)
+- **CIFAR-10**: 10 classes, 3×32×32 colored images
+- **CIFAR-20**: 20 classes, 3×32×32 colored images  
+- **CIFAR-100**: 100 classes, 3×32×32 colored images
+- **Tiny-ImageNet-200**: 200 classes, 3×64×64 colored images
 
-## Quick Start: Complementary Label Learning on MNIST
+### Standard Datasets (from libcll)
+- MNIST, FMNIST, KMNIST
+- Yeast, Texture, Dermatology, Control
+- CIFAR-10, CIFAR-20, CIFAR-100
+- Micro ImageNet-10, Micro ImageNet-20
+- CLCIFAR-10, CLCIFAR-20 (with human-annotated complementary labels)
+- ACLCIFAR-10, ACLCIFAR-20 (with VLM-annotated complementary labels)
 
-To reproduce training results with the SCL-NL method on MNIST for each distribution:
 
-### Uniform Distribution
+## Batch Training Scripts
 
-```shell
-python scripts/train.py \
-  --do_train \
-  --do_predict \
-  --strategy SCL \
-  --type NL \
-  --model MLP \
-  --dataset MNIST \
-  --lr 1e-4 \
-  --batch_size 256 \
-  --valid_type Accuracy \
-```
+Run comprehensive experiments across different bias patterns:
 
-### Biased Distribution (Weak Deviation)
-
-```shell
-python scripts/train.py \
-  --do_train \
-  --do_predict \
-  --strategy SCL \
-  --type NL \
-  --model MLP \
-  --dataset MNIST \
-  --lr 1e-4 \
-  --batch_size 256 \
-  --valid_type Accuracy \
-  --transition_matrix weak
-```
-### Biased Distribution (Strong Deviation)
-
-```shell
-python scripts/train.py \
-  --do_train \
-  --do_predict \
-  --strategy SCL \
-  --type NL \
-  --model MLP \
-  --dataset MNIST \
-  --lr 1e-4 \
-  --batch_size 256 \
-  --valid_type Accuracy \
-  --transition_matrix strong
-```
-
-### Noisy Distribution
-
-```shell
-python scripts/train.py \
-  --do_train \
-  --do_predict \
-  --strategy SCL \
-  --type NL \
-  --model MLP \
-  --dataset MNIST \
-  --lr 1e-4 \
-  --batch_size 256 \
-  --valid_type Accuracy \
-  --transition_matrix noisy
-  --noise 0.1
-```
-### Multiple Complementary Label Learning
-
-```shell
-python scripts/train.py \
-  --do_train \
-  --do_predict \
-  --strategy SCL \
-  --type NL \
-  --model MLP \
-  --dataset MNIST \
-  --lr 1e-4 \
-  --batch_size 256 \
-  --valid_type Accuracy \
-  --num_cl 3
-```
-
-## Run all the settings in the survey paper
-
-The following scripts reproduce the results for one strategy presented in the survey paper. They include a grid search over learning rates from {1e-3, 5e-4, 1e-4, 5e-5, 1e-5}, followed by training with the best learning rate using four different random seeds.
-
-```shell
+```bash
+# Uniform distribution baseline
 ./scripts/uniform.sh <strategy> <type>
+
+# Biased distributions (weak/strong)
 ./scripts/biased.sh <strategy> <type>
+
+# Noisy distributions
 ./scripts/noisy.sh <strategy> <type>
+
+# Multiple complementary labels
 ./scripts/multi.sh <strategy> <type>
 ./scripts/multi_hard.sh <strategy> <type>
 ```
 
-For example:
-
-```shell
+Example:
+```bash
 ./scripts/uniform.sh SCL NL
-./scripts/biased.sh SCL NL
-./scripts/noisy.sh SCL NL
-./scripts/multi.sh SCL NL
-./scripts/multi_hard.sh SCL NL
+./scripts/biased.sh CPE T
 ```
 
-# Documentation
+## Understanding Transition Matrices
 
-The documentation for the latest release is available on [readthedocs](https://libcll.readthedocs.io/en/latest/). Feedback, questions, and suggestions are highly encouraged. Contributions to improve the documentation are warmly welcomed and greatly appreciated!
+A transition matrix `Q` defines the probability distribution for complementary label generation. Each element `Q[i][j]` represents the probability of assigning complementary label `j` given true label `i`.
 
-# Citing
+- **Uniform**: All complementary labels (excluding true label) are equally likely
+- **Biased**: Some complementary labels are more likely than others
+- **VLM-Based**: Bias patterns derived from Vision-Language Model confusion patterns
+- **Clustering-Based**: Bias based on visual similarity clustering before VLM
 
-If you find this package useful, please cite both the original works associated with each strategy and the following:
+The transition matrix is automatically loaded when specified via `--transition_matrix`. The system searches for the corresponding `.txt` file in the appropriate dataset subdirectory under `libcll/transition_matrix/`. If the flag isn't specified, it would use random uniform distribution.
 
+## Advanced Usage
+
+
+### Custom Seed for Reproducibility
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy SCL \
+  --type NL \
+  --model ResNet18 \
+  --dataset cifar20 \
+  --lr 1e-4 \
+  --batch_size 256 \
+  --valid_type Accuracy \
+  --transition_matrix least \
+  --seed 42
 ```
+
+### Data Augmentation Options
+
+```bash
+python scripts/train.py \
+  --do_train \
+  --do_predict \
+  --strategy CPE \
+  --type T \
+  --model ResNet18 \
+  --dataset cifar100 \
+  --lr 1e-4 \
+  --batch_size 128 \
+  --valid_type Accuracy \
+  --transition_matrix llava_kmean=100_nrand=4 \
+  --augment autoaugment
+```
+
+## Output and Logging
+
+Training results are logged to `lightning_logs/` with TensorBoard support. Each run creates:
+
+- **Metrics CSV**: Detailed epoch-by-epoch metrics (`metrics.csv`)
+- **Summary JSON**: Final results and hyperparameters (`summary.json`)
+- **Transition Matrix**: The used transition matrix saved as `<dataset>.txt`
+- **Checkpoints**: Best model checkpoints (if enabled)
+
+View training progress with TensorBoard:
+```bash
+tensorboard --logdir lightning_logs/
+```
+
+## Citation
+
+If you use this repository, please cite the original `libcll` work and mention this extension:
+
+```bibtex
 @techreport{libcll2024,
   author = {Nai-Xuan Ye and Tan-Ha Mai and Hsiu-Hsuan Wang and Wei-I Lin and Hsuan-Tien Lin},
   title = {libcll: an Extendable Python Toolkit for Complementary-Label Learning},
@@ -183,13 +265,10 @@ If you find this package useful, please cite both the original works associated 
 }
 ```
 
-# Acknowledgment
+## Documentation
 
-We would like to express our gratitude to the following repositories for sharing their code, which greatly facilitated the development of `libcll`:
-* [URE and FWD implementation](https://github.com/takashiishida/comp)
-* [DM official implementation](http://palm.seu.edu.cn/zhangml/Resources.htm#icml21b)
-* [OP official implementation](https://github.com/yzcao-nkg/OPCLL)
-* [SCARCE official implementation](https://github.com/wwangwitsel/SCARCE/tree/main)
-* [CLImage Dataset implementation](https://github.com/ntucllab/CLImage_Dataset)
-* [ACLImage Dataset implementation](https://github.com/yahcreepers/PAKDD_ACLImage_Dataset)
-* [Code structure](https://github.com/ntucllab/imbalanced-DL)
+For more details on the base library, visit the [libcll documentation](https://libcll.readthedocs.io/en/latest/).
+
+## Acknowledgments
+
+This work extends [libcll](https://github.com/ntucllab/libcll) with transition matrix support for biased complementary label learning research. We thank the original authors and all contributors to the repositories that made this work possible.
